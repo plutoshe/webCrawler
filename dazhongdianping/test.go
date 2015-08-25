@@ -12,6 +12,7 @@ Pckages may be imported:
 import (
 	"fmt"
 	"net/url"
+	"regexp"
 	"strings"
 
 	"github.com/PuerkitoBio/goquery"
@@ -48,13 +49,6 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 	var urls []string
 	query.Find("a").Each(func(i int, s *goquery.Selection) {
 		href, _ := s.Attr("href")
-		// s.
-		// urls = append(urls, "http://github.com/"+href)
-		// fmt.Println("======================================")
-		// fmt.Println(s.Attr("href"))
-		// fmt.Println(href)
-		// fmt.Println(s.AttrOr(attrName, defaultValue))
-		// fmt.Println("======================================")
 		var absHref string
 		urlHref, err := url.Parse(href)
 		if err != nil {
@@ -65,16 +59,18 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 			urlPrefix := p.GetRequest().GetUrl()
 			absHref = urlPrefix + href
 			absHref = absHref
-			// fmt.Println(absHref)
-			urls = append(urls, absHref)
 		} else {
-			// fmt.Println(href)
-			urls = append(urls, href)
+			fmt.Println(href)
+			inDomain := regexp.MustCompile("dianping\\.com")
+			if inDomain.MatchString(href) {
+				fmt.Println("in  ", href)
+				urls = append(urls, href)
+			}
 		}
 
 	})
 	// these urls will be saved and crawed by other coroutines.
-	p.AddTargetRequests(urls, "html")
+	// p.AddTargetRequests(urls, "html")
 	// content, _ := query.Html()
 	// fmt.Println(content)
 
@@ -101,8 +97,8 @@ func main() {
 	//  PageProcesser ;
 	//  Task name used in Pipeline for record;
 	spider.NewSpider(NewMyPageProcesser(), "TaskName").
-		AddUrl("http://t.dianping.com/beijing", "html"). // Start url, html is the responce type ("html" or "json" or "jsonp" or "text")
-		AddPipeline(pipeline.NewPipelineConsole()).      // Print result on screen
-		SetThreadnum(3).                                 // Crawl request by three Coroutines
+		AddUrl("http://www.dianping.com", "html").  // Start url, html is the responce type ("html" or "json" or "jsonp" or "text")
+		AddPipeline(pipeline.NewPipelineConsole()). // Print result on screen
+		SetThreadnum(3).                            // Crawl request by three Coroutines
 		Run()
 }
