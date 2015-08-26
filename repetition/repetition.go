@@ -3,15 +3,15 @@ package repetition
 
 var visited map[string]bool
 
-func initializeVisited() {
+func InitializeVisited() {
 	visited = make(map[string]bool)
 }
 
-func visitedNewNode(key string) {
+func VisitedNewNode(key string) {
 	visited[key] = true
 }
 
-func checkIfVisited(key string) bool {
+func CheckIfVisited(key string) bool {
 	_, ok := visited[key]
 	return ok
 }
