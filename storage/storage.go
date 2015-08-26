@@ -11,12 +11,12 @@ const (
 	MONGODB_COLLECTION = "urlcollection"
 )
 
-type storeFormat struct {
+type StoreFormat struct {
 	Url     string
 	Content string
 }
 
-func link2Db(dburl string) (*mgo.Session, error) {
+func Link2Db(dburl string) (*mgo.Session, error) {
 	session, err := mgo.Dial(dburl)
 	if err != nil {
 		return nil, err
@@ -25,11 +25,11 @@ func link2Db(dburl string) (*mgo.Session, error) {
 	return session, nil
 }
 
-func link2DbByDefault() (*mgo.Session, error) {
-	return link2Db(MONGODB_URL)
+func Link2DbByDefault() (*mgo.Session, error) {
+	return Link2Db(MONGODB_URL)
 }
 
-func link2Collection(session *mgo.Session, dbname, username, password, collectionname string, auth bool) *mgo.Collection {
+func Link2Collection(session *mgo.Session, dbname, username, password, collectionname string, auth bool) *mgo.Collection {
 	mongoDb := session.DB(dbname)
 	if auth {
 		mongoDb.Login(username, password)
@@ -38,11 +38,11 @@ func link2Collection(session *mgo.Session, dbname, username, password, collectio
 
 }
 
-func link2CollectionByDefault(session *mgo.Session) *mgo.Collection {
-	return link2Collection(session, MONGODB_DB, MONGODB_USER, MONGODB_PWD, MONGODB_COLLECTION, true)
+func Link2CollectionByDefault(session *mgo.Session) *mgo.Collection {
+	return Link2Collection(session, MONGODB_DB, MONGODB_USER, MONGODB_PWD, MONGODB_COLLECTION, true)
 }
 
-func storeInsert(c *mgo.Collection, in storeFormat) error {
+func StoreInsert(c *mgo.Collection, in StoreFormat) error {
 	err := c.Insert(&in)
 	return err
 }
