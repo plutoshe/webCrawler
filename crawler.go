@@ -36,7 +36,8 @@ func NewMyPageProcesser() *MyPageProcesser {
 }
 
 func checkMatchPattern(base, href string) bool {
-	inDomain := regexp.MustCompile("dianping\\.com")
+	// inDomain := regexp.MustCompile("dianping\\.com")
+	inDomain := regexp.MustCompile("dianping\\.com(\\/[^\\/\n]+){2,2}$")
 	if inDomain.MatchString(href) {
 		// fmt.Println("in  ", href)
 		return true
@@ -66,8 +67,9 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 		}
 		// Temporarily check in crawler.go, it will be implemented in pattern package.
 		if checkMatchPattern(base, href) {
-			urls = urls
-			// urls = append(urls, href)
+			fmt.Println(href)
+			// urls = urls
+			urls = append(urls, href)
 		}
 	})
 
@@ -75,7 +77,10 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 
 	fmt.Println("==store==", currentUrl)
 	content, _ := query.Html()
+	// content := ""
 	storage.StoreInsert(collection, storage.StoreFormat{currentUrl, content})
+
+	p.AddTargetRequests(urls, "html")
 
 }
 

@@ -42,6 +42,8 @@ func Link2CollectionByDefault(session *mgo.Session) *mgo.Collection {
 	return Link2Collection(session, MONGODB_DB, MONGODB_USER, MONGODB_PWD, MONGODB_COLLECTION, true)
 }
 
+//TO-DO
+//extend to StoreFormat...(a sequence of StoreFormat)
 func StoreInsert(c *mgo.Collection, in StoreFormat) error {
 	err := c.Insert(&in)
 	return err
