@@ -20,6 +20,7 @@ import (
 	"github.com/hu17889/go_spider/core/common/page"
 	"github.com/hu17889/go_spider/core/pipeline"
 	"github.com/hu17889/go_spider/core/spider"
+	"github.com/plutoshe/webCrawler/repetition"
 	"github.com/plutoshe/webCrawler/storage"
 	"gopkg.in/mgo.v2"
 )
@@ -66,9 +67,10 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 			href = currentUrl + href
 		}
 		// Temporarily check in crawler.go, it will be implemented in pattern package.
-		if checkMatchPattern(base, href) {
+		if !repetition.CheckIfVisited(href) && checkMatchPattern(base, href) {
 			fmt.Println(href)
 			// urls = urls
+			repetition.VisitedNewNode(href)
 			urls = append(urls, href)
 		}
 	})
@@ -91,6 +93,7 @@ func (this *MyPageProcesser) Finish() {
 
 func main() {
 	// db initilization
+	repetition.InitializeVisited()
 	dbSession, err := storage.Link2DbByDefault()
 	defer dbSession.Close()
 	if err != nil {
