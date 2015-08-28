@@ -10,6 +10,7 @@ Pckages may be imported:
     "github.com/PuerkitoBio/goquery": html dom parser.
 */
 import (
+	"flag"
 	"fmt"
 	"log"
 	"net/url"
@@ -25,9 +26,16 @@ import (
 	"gopkg.in/mgo.v2"
 )
 
-var collection *mgo.Collection
-
-var base string = "www.dazhongdainping.com"
+var (
+	collection     *mgo.Collection
+	base           = "www.dazhongdainping.com"
+	databaseURL    = flag.String("dbURL", storage.MONGODB_URL, "Identify the linked db adress")
+	databaseName   = flag.String("dbname", storage.MONGODB_DB, "Denote the database name of mongodb")
+	databaseAuth   = flag.Bool("dbauth", false, "Denote whether link datatbase by authentication or not")
+	databaseUser   = flag.String("dbuser", storage.MONGODB_USER, "Denote the user name of db")
+	databasePwd    = flag.String("dbpwd", storage.MONGODB_PWD, "Regarding the user name, denote corresponding password")
+	collectionName = flag.String("collection", storage.MONGODB_COLLECTION, "Denote the coolection name to operate")
+)
 
 type MyPageProcesser struct {
 }
@@ -93,13 +101,14 @@ func (this *MyPageProcesser) Finish() {
 
 func main() {
 	// db initilization
+	flag.Parse()
 	repetition.InitializeVisited()
-	dbSession, err := storage.Link2DbByDefault()
+	dbSession, err := storage.Link2Db(*databaseURL)
 	defer dbSession.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
-	collection = storage.Link2CollectionByDefault(dbSession)
+	collection = storage.Link2Collection(dbSession, *databaseName, *databaseUser, *databasePwd, *collectionName, *databaseAuth)
 
 	// Spider input:
 	//  PageProcesser ;
@@ -110,6 +119,6 @@ func main() {
 	spider.NewSpider(NewMyPageProcesser(), "TaskName").
 		AddUrl("http://www.dianping.com", "html").  // Start url, html is the responce type ("html" or "json" or "jsonp" or "text")
 		AddPipeline(pipeline.NewPipelineConsole()). // Print result on screen
-		SetThreadnum(3).                            // Crawl request by three Coroutines
+		SetThreadnum(4).                            // Crawl request by three Coroutines
 		Run()
 }
