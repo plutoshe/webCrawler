@@ -75,10 +75,8 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 			href = currentUrl + href
 		}
 		// Temporarily check in crawler.go, it will be implemented in pattern package.
-		if !repetition.CheckIfVisited(href) && checkMatchPattern(base, href) {
-			fmt.Println(href)
-			// urls = urls
-			repetition.VisitedNewNode(href)
+		if checkMatchPattern(base, href) && !repetition.CheckIfVisited(href) {
+			repetition.VisitedNewNode(redisClient, href)
 			urls = append(urls, href)
 		}
 	})
