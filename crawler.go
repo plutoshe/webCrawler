@@ -24,6 +24,7 @@ import (
 	"github.com/plutoshe/webCrawler/repetition"
 	"github.com/plutoshe/webCrawler/storage"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/redis.v3"
 )
 
 var (
@@ -97,6 +98,15 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 func (this *MyPageProcesser) Finish() {
 	// fmt.Printf("TODO:before end spider \r\n")
 
+}
+
+func RedisNewClient() *redis.Client {
+	client := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	return client
 }
 
 func main() {
