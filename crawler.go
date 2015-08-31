@@ -24,10 +24,12 @@ import (
 	"github.com/plutoshe/webCrawler/repetition"
 	"github.com/plutoshe/webCrawler/storage"
 	"gopkg.in/mgo.v2"
+	"gopkg.in/redis.v3"
 )
 
 var (
 	collection     *mgo.Collection
+	rep            repetition.RepetitionJudgement
 	base           = "www.dazhongdainping.com"
 	databaseURL    = flag.String("dbURL", storage.MONGODB_URL, "Identify the linked db adress")
 	databaseName   = flag.String("dbname", storage.MONGODB_DB, "Denote the database name of mongodb")
@@ -75,9 +77,13 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 			href = currentUrl + href
 		}
 		// Temporarily check in crawler.go, it will be implemented in pattern package.
-		if checkMatchPattern(base, href) && !repetition.CheckIfVisited(href) {
-			repetition.VisitedNewNode(redisClient, href)
-			urls = append(urls, href)
+
+		if checkMatchPattern(base, href) {
+			visited, _ := rep.CheckIfVisited(href)
+			if !visited {
+				rep.VisitedNewNode(href)
+				urls = append(urls, href)
+			}
 		}
 	})
 
@@ -100,7 +106,17 @@ func (this *MyPageProcesser) Finish() {
 func main() {
 	// db initilization
 	flag.Parse()
-	repetition.InitializeVisited()
+	c := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	rep = repetition.RepetitionJudgement{}
+	err := rep.InitializeVisited(c, "repetition")
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	dbSession, err := storage.Link2Db(*databaseURL)
 	defer dbSession.Close()
 	if err != nil {
