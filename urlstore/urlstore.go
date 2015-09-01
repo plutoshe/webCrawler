@@ -9,7 +9,11 @@
 
 package urlstore
 
-import "gopkg.in/redis.v3"
+import (
+	"strings"
+
+	"gopkg.in/redis.v3"
+)
 
 type URLCrawlerStore struct {
 	redisServer          *redis.Client
@@ -35,8 +39,12 @@ func (t *URLCrawlerStore) InitialURLsStore(c *redis.Client, colNeedCrawl string,
 func (t *URLCrawlerStore) GetOneNeedCrawlerURL() (string, error) {
 	url, err := t.redisServer.SPop(t.collectionNeedCrawl).Result()
 	if err != nil {
+		if strings.Contains(err.Error(), "redis: nil") {
+			return "", nil
+		}
 		return "", err
 	}
+
 	rep, err := t.redisServer.SAdd(t.collectionNeedCommit, url).Result()
 	if rep == 0 {
 		return "", nil
