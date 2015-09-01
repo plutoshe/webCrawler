@@ -16,6 +16,7 @@ import (
 	"net/url"
 	"regexp"
 
+	"./urlstore"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/henrylee2cn/pholcus/common/mlog"
 	"github.com/hu17889/go_spider/core/common/page"
@@ -28,8 +29,12 @@ import (
 )
 
 var (
+	exitChan       chan struct{}
+	getURL         chan string
+	releaseSlot    chan int
 	collection     *mgo.Collection
 	rep            repetition.RepetitionJudgement
+	urlstr         urlstore.URLCrawlerStore
 	base           = "www.dazhongdainping.com"
 	databaseURL    = flag.String("dbURL", storage.MONGODB_URL, "Identify the linked db adress")
 	databaseName   = flag.String("dbname", storage.MONGODB_DB, "Denote the database name of mongodb")
@@ -37,6 +42,7 @@ var (
 	databaseUser   = flag.String("dbuser", storage.MONGODB_USER, "Denote the user name of db")
 	databasePwd    = flag.String("dbpwd", storage.MONGODB_PWD, "Regarding the user name, denote corresponding password")
 	collectionName = flag.String("collection", storage.MONGODB_COLLECTION, "Denote the coolection name to operate")
+	threadNum      = flag.Int("threadNum", 4, "Specify the thread number to crawl. The default value is 4.")
 )
 
 type MyPageProcesser struct {
@@ -82,17 +88,25 @@ func (this *MyPageProcesser) Process(p *page.Page) {
 			visited, _ := rep.CheckIfVisited(href)
 			if !visited {
 				rep.VisitedNewNode(href)
-				urls = append(urls, href)
+				// urls = append(urls, href)
+				urlstr.UploadURL(href)
 			}
 		}
 	})
 
 	// store content to db
 
-	fmt.Println("==store==", currentUrl)
+	fmt.Printf("====store & commit : %s====\n\n\n", currentUrl)
 	content, _ := query.Html()
 	// content := ""
 	storage.StoreInsert(collection, storage.StoreFormat{currentUrl, content})
+	urlstr.CommitURL(currentUrl)
+	releaseSlot <- 1
+
+	url := GetOneURL()
+	if url != "" {
+		urls = append(urls, url)
+	}
 
 	p.AddTargetRequests(urls, "html")
 
@@ -103,35 +117,90 @@ func (this *MyPageProcesser) Finish() {
 
 }
 
-func RedisNewClient() *redis.Client {
-	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
-	})
-	return client
+func distributeURL(threadNum int, urlstr urlstore.URLCrawlerStore) {
+	var remain int = 0
+	for {
+		select {
+		case <-releaseSlot:
+			remain++
+			oldRemain := remain
+			for i := 0; i < oldRemain; i++ {
+				url, err := urlstr.GetOneNeedCrawlerURL()
+				if err != nil {
+					log.Printf("Distribute URL error, error Msg = \"%v\"\n", err)
+					continue
+				}
+				if url == "" {
+					break
+				}
+				remain--
+				getURL <- url
+			}
+			if oldRemain == threadNum && remain == threadNum {
+				close(exitChan)
+				break
+			}
+		}
+	}
+}
+
+func GetOneURL() string {
+	for {
+		select {
+		case URL := <-getURL:
+			return URL
+		case <-exitChan:
+			return ""
+		}
+	}
 }
 
 func main() {
-	// db initilization
 	flag.Parse()
+	// chan init
+	exitChan = make(chan struct{})
+	getURL = make(chan string, *threadNum)
+	releaseSlot = make(chan int, *threadNum)
+
+	// repetition and urlstor initialization
+	// TODO:
+	// Add flag configuration of redis
 	c := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
 		DB:       0,  // use default DB
 	})
+
 	rep = repetition.RepetitionJudgement{}
 	err := rep.InitializeVisited(c, "repetition")
 	if err != nil {
 		log.Fatal(err)
 	}
 
+	urlstr = urlstore.URLCrawlerStore{}
+	_, err = urlstr.InitialURLsStore(c, "colNeedCrawl", "colNeedCommit", "colNeedCrawl", "colNeedCommit")
+	visited, _ := rep.CheckIfVisited("http://www.dianping.com/")
+	if !visited {
+		rep.VisitedNewNode("http://www.dianping.com/")
+		urlstr.UploadURL("http://www.dianping.com/")
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	// db initilization
 	dbSession, err := storage.Link2Db(*databaseURL)
 	defer dbSession.Close()
 	if err != nil {
 		log.Fatal(err)
 	}
 	collection = storage.Link2Collection(dbSession, *databaseName, *databaseUser, *databasePwd, *collectionName, *databaseAuth)
+	go distributeURL(*threadNum, urlstr)
+	// url initilziation
+	for i := 0; i < *threadNum; i++ {
+		releaseSlot <- 1
+	}
+	rootURL := GetOneURL()
 
 	// Spider input:
 	//  PageProcesser ;
@@ -140,8 +209,8 @@ func main() {
 	// Change to goroutine mechanism, use channel to get url
 	// Able to start serveral goroutine to crawler a same website.
 	spider.NewSpider(NewMyPageProcesser(), "TaskName").
-		AddUrl("http://www.dianping.com", "html").  // Start url, html is the responce type ("html" or "json" or "jsonp" or "text")
+		AddUrl(rootURL, "html").                    // Start url, html is the responce type ("html" or "json" or "jsonp" or "text")
 		AddPipeline(pipeline.NewPipelineConsole()). // Print result on screen
-		SetThreadnum(4).                            // Crawl request by three Coroutines
+		SetThreadnum((uint)(*threadNum)).           // Crawl request by three Coroutines
 		Run()
 }
