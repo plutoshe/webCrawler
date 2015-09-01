@@ -16,7 +16,6 @@ import (
 	"net/url"
 	"regexp"
 
-	"./urlstore"
 	"github.com/PuerkitoBio/goquery"
 	"github.com/henrylee2cn/pholcus/common/mlog"
 	"github.com/hu17889/go_spider/core/common/page"
@@ -24,25 +23,35 @@ import (
 	"github.com/hu17889/go_spider/core/spider"
 	"github.com/plutoshe/webCrawler/repetition"
 	"github.com/plutoshe/webCrawler/storage"
+	"github.com/plutoshe/webCrawler/urlstore"
 	"gopkg.in/mgo.v2"
 	"gopkg.in/redis.v3"
 )
 
 var (
-	exitChan       chan struct{}
-	getURL         chan string
-	releaseSlot    chan int
-	collection     *mgo.Collection
-	rep            repetition.RepetitionJudgement
-	urlstr         urlstore.URLCrawlerStore
-	base           = "www.dazhongdainping.com"
+	exitChan    chan struct{}
+	getURL      chan string
+	releaseSlot chan int
+	collection  *mgo.Collection
+	rep         repetition.RepetitionJudgement
+	urlstr      urlstore.URLCrawlerStore
+	base        = "www.dazhongdainping.com"
+
+	// spider configuration
+	threadNum = flag.Int("threadNum", 4, "Specify the thread number to crawl. The default value is 4.")
+
+	// redis configuration
+	redisURL = flag.String("redisURL", "localhost:6379", "Specify the url address of redis")
+	redisPWD = flag.String("redisPWD", "", "Specify the password linking redis")
+	redisDB  = flag.Int64("redisDB", 0, "Set redis db num")
+
+	// mongodb configuration
 	databaseURL    = flag.String("dbURL", storage.MONGODB_URL, "Identify the linked db adress")
 	databaseName   = flag.String("dbname", storage.MONGODB_DB, "Denote the database name of mongodb")
 	databaseAuth   = flag.Bool("dbauth", false, "Denote whether link datatbase by authentication or not")
 	databaseUser   = flag.String("dbuser", storage.MONGODB_USER, "Denote the user name of db")
 	databasePwd    = flag.String("dbpwd", storage.MONGODB_PWD, "Regarding the user name, denote corresponding password")
 	collectionName = flag.String("collection", storage.MONGODB_COLLECTION, "Denote the coolection name to operate")
-	threadNum      = flag.Int("threadNum", 4, "Specify the thread number to crawl. The default value is 4.")
 )
 
 type MyPageProcesser struct {
@@ -163,18 +172,16 @@ func main() {
 	releaseSlot = make(chan int, *threadNum)
 
 	// repetition and urlstor initialization
-	// TODO:
-	// Add flag configuration of redis
 	c := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
-		Password: "", // no password set
-		DB:       0,  // use default DB
+		Addr:     *redisURL,
+		Password: *redisPWD,
+		DB:       *redisDB,
 	})
 
 	rep = repetition.RepetitionJudgement{}
 	err := rep.InitializeVisited(c, "repetition")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("redis error, ", err)
 	}
 
 	urlstr = urlstore.URLCrawlerStore{}
@@ -185,14 +192,14 @@ func main() {
 		urlstr.UploadURL("http://www.dianping.com/")
 	}
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("urlstore initialzation error, ", err)
 	}
 
 	// db initilization
 	dbSession, err := storage.Link2Db(*databaseURL)
 	defer dbSession.Close()
 	if err != nil {
-		log.Fatal(err)
+		log.Fatal("mongodb error, ", err)
 	}
 	collection = storage.Link2Collection(dbSession, *databaseName, *databaseUser, *databasePwd, *collectionName, *databaseAuth)
 	go distributeURL(*threadNum, urlstr)
@@ -205,9 +212,6 @@ func main() {
 	// Spider input:
 	//  PageProcesser ;
 	//  Task name used in Pipeline for record;
-	// TO-DO :
-	// Change to goroutine mechanism, use channel to get url
-	// Able to start serveral goroutine to crawler a same website.
 	spider.NewSpider(NewMyPageProcesser(), "TaskName").
 		AddUrl(rootURL, "html").                    // Start url, html is the responce type ("html" or "json" or "jsonp" or "text")
 		AddPipeline(pipeline.NewPipelineConsole()). // Print result on screen
