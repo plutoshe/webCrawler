@@ -32,7 +32,7 @@ func (t *URLCrawlerStore) InitialURLsStore(c *redis.Client, colNeedCrawl string,
 	return result, err
 }
 
-func (t *URLCrawlerStore) GetOneNeddCrawlerURL(c *redis.Client) (string, error) {
+func (t *URLCrawlerStore) GetOneNeedCrawlerURL() (string, error) {
 	url, err := t.redisServer.SPop(t.collectionNeedCrawl).Result()
 	if err != nil {
 		return "", err

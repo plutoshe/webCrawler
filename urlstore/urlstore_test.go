@@ -79,3 +79,45 @@ func TestUploadURL(t *testing.T) {
 		}
 	}
 }
+
+func TestGetOneNeedCrawlerURL(t *testing.T) {
+	c := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "", // no password set
+		DB:       0,  // use default DB
+	})
+	var testdata = []struct {
+		wantedNum int
+		addString [][]string
+	}{
+		{5, [][]string{[]string{"t1", "t2"}, []string{"t1", "t3"}, []string{"t4", "t5"}}},
+		{3, [][]string{[]string{"t1", "t2", "t3"}}},
+	}
+	for _, i := range testdata {
+		store := &URLCrawlerStore{}
+		store.InitialURLsStore(c, "t5", "com")
+		exist := make(map[string]bool)
+		for _, addition := range i.addString {
+			for _, node := range addition {
+				exist[node] = true
+			}
+			_, err := store.UploadURL(addition...)
+			if err != nil {
+				t.Fatalf("Test Upload URL failed, error message = %v\n", err)
+			}
+		}
+		for {
+			url, err := store.GetOneNeedCrawlerURL()
+			if url == "" {
+				break
+			}
+			if err != nil {
+				t.Fatalf("Test Get One Need Crawler URL failed, error message = %v\n", err)
+			}
+			_, ok := exist[url]
+			if !ok {
+				t.Fatalf("Test Get One Need Crawler URL failed. Get unwanted URL = %s.\n", url)
+			}
+		}
+	}
+}
