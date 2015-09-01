@@ -80,7 +80,7 @@ func TestUploadURL(t *testing.T) {
 	}
 }
 
-func TestGetOneNeedCrawlerURL(t *testing.T) {
+func TestGetOneNeedCrawlerURLAndCommitURL(t *testing.T) {
 	c := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "", // no password set
@@ -118,6 +118,34 @@ func TestGetOneNeedCrawlerURL(t *testing.T) {
 			if !ok {
 				t.Fatalf("Test Get One Need Crawler URL failed. Get unwanted URL = %s.\n", url)
 			}
+		}
+		cSize, err := c.SCard("com").Result()
+		if err != nil {
+			t.Fatalf("Test Get One Need Crawler URL failed, error message = %v\n", err)
+		}
+		if len(exist) != (int)(cSize) {
+			t.Fatalf(
+				"Test Get One Need Crawler URL failed, need commit queue size mismatch. Wanted = %d. Get = %d\n",
+				len(exist),
+				cSize,
+			)
+		}
+		for i, _ := range exist {
+			_, err := store.CommitURL(i)
+			if err != nil {
+				t.Fatalf("Test Commit URL failed, error message = %v\n", err)
+			}
+		}
+		cSize, err = c.SCard("com").Result()
+		if err != nil {
+			t.Fatalf("Test Commit URL failed, error message = %v\n", err)
+		}
+		if cSize != 0 {
+			t.Fatalf(
+				"Test Commit URL failed, need commit queue size mismatch. Wanted = %d. Get = %d\n",
+				0,
+				cSize,
+			)
 		}
 	}
 }
